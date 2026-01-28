@@ -1,0 +1,33 @@
+# Generated PowerShell payloads
+*.ps1
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Shellcode binaries
+*.bin
+*.exe
+*.dll
+
+# Test files
+test_*.py
+test_*.ps1
+
+# Temporary files
+*.tmp
+*.log
+*.txt
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
