@@ -2,6 +2,25 @@
 
 An advanced PowerShell payload generator with Chimera-style obfuscation, XOR encryption, and aggressive anti-detection techniques.
 
+## ⚠️ DISCLAIMER
+
+**THIS PROJECT IS INTENDED FOR EDUCATIONAL PURPOSES AND SECURITY RESEARCH ONLY**
+
+This tool is designed for:
+- **Security research and study**: Understanding obfuscation techniques and payload delivery mechanisms
+- **Enhancing detection capabilities**: Helping blue teams and security researchers improve their detection rules and defensive strategies
+- **Authorized penetration testing**: Only in controlled environments with explicit written permission
+
+### Important Requirements:
+- ✅ **MUST** be used only in controlled, isolated laboratory environments
+- ✅ **MUST** have explicit written authorization before testing on any system
+- ✅ **MUST NOT** be used for unauthorized access or malicious purposes
+- ⚠️ Unauthorized access to computer systems is **illegal** and may result in severe legal consequences
+
+The authors and contributors assume **NO LIABILITY** for misuse, damage, or illegal activities conducted with this tool. By using this software, you agree to use it responsibly and in accordance with all applicable laws and regulations.
+
+---
+
 ## Features
 
 ### 🎭 Chimera-Style Obfuscation
@@ -9,7 +28,6 @@ An advanced PowerShell payload generator with Chimera-style obfuscation, XOR enc
 - `System.Management.Automation` string obfuscation
 - `amsiInitFailed` field name obfuscation
 - Random variable names (15-25 characters)
-- Corporate-themed comments for legitimacy
 - Random indentation
 - Backtick injection in cmdlets
 
@@ -26,11 +44,7 @@ An advanced PowerShell payload generator with Chimera-style obfuscation, XOR enc
 - Random delegate names (replaces `ShellcodeDelegate`)
 - EntryPoint remapping
 
-### 🥷 Stealth Features
-- No `Write-Error` statements
-- No `Write-Host` statements (except debug mode)
-- Silent error handling
-- No revealing comments
+
 
 ## Installation
 
@@ -205,13 +219,9 @@ powershell -ExecutionPolicy Bypass -File generated_payload.ps1
 1. **Verify shellcode is correct architecture (x64 vs x86)**
 2. **Check EXITFUNC in msfvenom** (use `thread` not `process`)
 3. **Enable debug mode** to verify decryption
-4. **Test with calc.exe payload** first
 
-### PowerShell Syntax Errors
 
-- Ensure Python script completed successfully
-- Check for PowerShell version compatibility (requires PS 2.0+)
-- Review generated `.ps1` file for syntax issues
+
 
 ## Credits
 
@@ -219,16 +229,10 @@ Inspired by:
 - [Chimera](https://github.com/tokyoneon/Chimera) - PowerShell obfuscation
 - [Invoke-Obfuscation](https://github.com/danielbohannon/Invoke-Obfuscation) - Obfuscation techniques
 
-## Disclaimer
-
-**FOR EDUCATIONAL AND AUTHORIZED TESTING PURPOSES ONLY**
-
-This tool is intended for security professionals, penetration testers, and researchers conducting authorized security assessments. Unauthorized access to computer systems is illegal. The authors assume no liability for misuse of this tool.
-
 ## License
 
-Use responsibly and only on systems you own or have explicit permission to test.
+This project is provided "as-is" for educational and research purposes. Use responsibly and only in controlled environments or on systems you own or have explicit written permission to test.
 
 ---
 
-**Note**: This tool generates payloads that may be flagged by antivirus software. Always obtain proper authorization before testing.
+**Note**: This tool generates payloads that may be flagged by antivirus and EDR software. Always test in isolated, controlled environments and obtain proper authorization before any security assessment.
