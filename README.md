@@ -28,6 +28,7 @@ The authors and contributors assume **NO LIABILITY** for misuse, damage, or ille
 - `System.Management.Automation` string obfuscation
 - `amsiInitFailed` field name obfuscation
 - Random variable names (15-25 characters)
+- Dead code insertion (junk code between variables)
 - Random indentation
 - Backtick injection in cmdlets
 
@@ -124,11 +125,7 @@ Use debug mode to verify decryption is working:
 python3 adaptixpowerShell.py shellcode.bin -d
 ```
 
-Debug output will show:
-- Encrypted payload length
-- Decryption key length
-- Decrypted payload length
-- First 16 bytes of decrypted shellcode
+
 
 ## How It Works
 
@@ -136,8 +133,9 @@ Debug output will show:
 2. **Encryption**: XOR encrypts the shellcode with a random 16-byte key
 3. **Chunking**: Splits encrypted payload into multiple variables
 4. **Obfuscation**: Applies Chimera-style obfuscation techniques
-5. **Decryption**: PowerShell decrypts XOR payload at runtime
-6. **Injection**: Uses `VirtualAlloc` + `Marshal.Copy` for in-memory execution
+5. **Dead Code**: Inserts junk code between variables to hinder human analysis
+6. **Decryption**: PowerShell decrypts XOR payload at runtime
+7. **Injection**: Uses `VirtualAlloc` + `Marshal.Copy` for in-memory execution
 
 ## Obfuscation Techniques
 
@@ -161,6 +159,36 @@ $dll = $vKudKDAuMJHv + $DOOqHAdQjVXYBFc + $knbATApFWUpN + $hNverCTTZdykJ
 [Byte[]] $chunk3 = 0x4D,0x90,0xF7,0x58...
 [Byte[]] $encrypted = $chunk1 + $chunk2 + $chunk3
 ```
+
+### Dead Code Insertion (Anti-Human Analysis)
+```powershell
+# Real code mixed with junk code
+$realVariable = "important"
+Get-Random -Min 1 -Max 100 | Out-Null  # Dead code (unused)
+$junkVar = 'randomString'              # Dead code (unused)
+[Math]::Abs(-500) | Out-Null           # Dead code (unused)
+$anotherReal = "value"
+if ($undefined -eq $null) { $x = 5 }   # Dead code (never executes)
+$env:COMPUTERNAME | Out-Null           # Dead code (unused)
+```
+
+**10 Types of Dead Code:**
+1. Meaningless variable assignments
+2. Math operations with unused results  
+3. Conditionals that never execute
+4. String operations with unused results
+5. Environment variable checks (unused)
+6. Timestamp operations (unused)
+7. Random number generation (unused)
+8. Type checks (unused)
+9. Process checks (unused)
+10. Commented debugging code
+
+**Important Notes:**
+- Dead code is intelligently inserted between PowerShell lines
+- Scales with obfuscation level (20% at level 1, up to 40% at level 5)
+- Zero performance impact - all junk piped to `Out-Null` or never executes
+- Makes manual analysis harder for security researchers
 
 ### C# Class Obfuscation
 ```csharp
@@ -211,16 +239,6 @@ python3 adaptixpowerShell.py test.bin -l 3 -d
 # Test execution (should not crash)
 powershell -ExecutionPolicy Bypass -File generated_payload.ps1
 ```
-
-## Troubleshooting
-
-### Payload Not Executing
-
-1. **Verify shellcode is correct architecture (x64 vs x86)**
-2. **Check EXITFUNC in msfvenom** (use `thread` not `process`)
-3. **Enable debug mode** to verify decryption
-
-
 
 
 ## Credits
