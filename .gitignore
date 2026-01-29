@@ -19,7 +19,10 @@ test_*.ps1
 # Temporary files
 *.tmp
 *.log
-*.txt
+
+# Keep requirements.txt and documentation
+!requirements.txt
+!*.md
 
 # IDE files
 .vscode/
